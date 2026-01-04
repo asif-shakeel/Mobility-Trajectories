@@ -81,8 +81,7 @@ END_COL   = "end_h3"
 DATE_COL  = "date"
 TIME_COL  = "time"
 
-TOTAL_PER_BIN_FIXED = 120000
-SEED = 12345
+
 
 # Distance / gravity
 ALPHA = 0.50
@@ -117,7 +116,7 @@ CENTER_FIXED_IDS = ['8644c1a8fffffff', '8644c1aafffffff','8644c1a87ffffff'] #, '
 
 
 SPAN_START   = "2025-06-01 00:00:00"
-SPAN_END     = "2025-06-15 00:00:00"
+SPAN_END     = "2025-06-02 00:00:00"
 TIME_RES_MIN = 30
 
 SPAN_START_TS = pd.to_datetime(SPAN_START)
@@ -136,7 +135,7 @@ SPEED_MAX_KMH = 90.0    # freeway upper bound
 
 
 # Output controls
-STORE_P_PER_BIN = False
+STORE_P_PER_BIN = True
 STORE_PBAR      = True
 STORE_Q         = True
 STORE_X0        = True
@@ -340,7 +339,7 @@ MAKE_PEP_MAP      = True
 PEP_MAP_VALUE_COL = "initial_share"   # or "final_share"
 PEP_MAP_MODE      = "count"           # "share" or "count"
 
-TOTAL_PER_BIN_FIXED   = 120000*4        # you already wanted this
+TOTAL_PER_BIN_FIXED   = 120000        # you already wanted this
 SEED                  = 12345         # or whatever you’re using
 
 # ---------------------------------------------------------------------
@@ -2149,6 +2148,13 @@ def generate_pep_h3(
     # ----------------------------------------------------
     N = len(nodes_df)
     node_list = nodes_df["h3"].astype(str).tolist()
+
+    # ----------------------------------------------------
+    # Save node ordering (authoritative basis)
+    # ----------------------------------------------------
+    nodes_path = os.path.join(run_dir, "npz", "nodes.npy")
+    np.save(nodes_path, np.array(node_list, dtype=object))
+    print(f"[OK] wrote {nodes_path}")
 
     # Preload lat/lon arrays
     lat = nodes_df["lat"].to_numpy(float)
