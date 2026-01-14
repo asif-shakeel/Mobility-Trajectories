@@ -38,7 +38,7 @@ HUB_CENTER_LON = None
 GEOM_TOL_KM = 0.5
 FORCE_GEOM_CENTER_AS_HUB = False
 
-GRAPH_MODE = "grid"  # "corridors" | "grid"
+GRAPH_MODE = "corridors"  # "corridors" | "grid"
 FEEDER_MODE = "single"  # or "dual"
 EDGE_DIRECTION_MODE = "potential"  # or "geometric"
 # Whether to include background grid edges in outputs (in addition to corridor tree)
@@ -896,10 +896,12 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
             col = "#7e57c2"
 
         col = color_for_delta_T(delta_T)
-        if feeder_label > 0:
-            col = "#7e57c2"
-        if backbone_flag == 1:
-            col = "#00ff00"  # bright green backbone
+
+        if backbone_flag == 1 and feeder_label == 0:
+            col = "#00ff00"        # backbone (green)
+        elif feeder_label > 0:
+            col = "#7e57c2"        # feeder (purple)
+
         # tooltip
         tooltip_text = (
             f"{u} ↔ {v}"
@@ -935,7 +937,7 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
         else:
             direction = None
 
-        if direction:
+        if direction and feeder_label > 0 and backbone_flag == 0:
             a, b = direction
             la, loa = nodes[a]["lat"], nodes[a]["lon"]
             lb, lob = nodes[b]["lat"], nodes[b]["lon"]
@@ -956,7 +958,7 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
                             weight=3, opacity=1).add_to(g_arrows)
 
 
-        if direction:
+        if direction and feeder_label > 0 and backbone_flag == 0:
             a,b=direction
             la,loa=nodes[a]["lat"],nodes[a]["lon"]
             lb,lob=nodes[b]["lat"],nodes[b]["lon"]
