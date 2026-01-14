@@ -810,6 +810,14 @@ def html_to_png(html_path, png_path, width=1200, height=1200):
         page.screenshot(path=png_path)
         browser.close()
 
+def h3_cell_style(feature):
+    return {
+        "fillColor": "#ffffff",
+        "color": "#cccccc",
+        "weight": 1,
+        "fillOpacity": 0.15,
+    }
+
 def build_map(nodes, hubs, hub_ring_index, center_cell,
               edges_dir, metro_edges, corridor_edges, adj,
               prefix="h3_corridors", out_html=None):
@@ -822,7 +830,12 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
                  tiles="cartodbpositron",control_scale=True)
     Fullscreen().add_to(m)
 
+    g_cells = FeatureGroup("H3 cells", show=True)
+    m.add_child(g_cells)
+
     g_regular=FeatureGroup("Corridor/background",show=True)
+
+
 
     # g_grid = FeatureGroup(name="Base Grid (debug)", show=True)
     # m.add_child(g_grid)
@@ -858,6 +871,24 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
     metro_set=set(tuple(sorted(e)) for e in metro_edges)
     corridor_set=set(tuple(sorted(e)) for e in corridor_edges)
     feeder_dir={(e["start_h3"],e["end_h3"]): e["feeder_label"] for e in edges_dir}
+
+    from shapely.geometry import mapping
+
+    for h, nd in nodes.items():
+        poly = h3_cell_polygon(h)
+        geojson = {
+                    "type": "Feature",
+                    "geometry": mapping(poly),
+                    "properties": {}
+                }
+
+
+        folium.GeoJson(
+            geojson,
+            style_function=h3_cell_style,
+            tooltip=h
+        ).add_to(g_cells)
+
 
     # ============================================================
     # EDGE DRAWING WITH FULL LABELING (H3 ONLY)
