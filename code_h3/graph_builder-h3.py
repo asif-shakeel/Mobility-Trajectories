@@ -830,6 +830,26 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
                  tiles="cartodbpositron",control_scale=True)
     Fullscreen().add_to(m)
 
+
+    title_html = f"""
+    <div style="
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        background-color: rgba(255,255,255,0.9);
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 20px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">
+        Synthetic Mobility Network
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(title_html))
+
     g_cells = FeatureGroup("H3 cells", show=True)
     m.add_child(g_cells)
 
