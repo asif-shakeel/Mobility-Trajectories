@@ -116,7 +116,7 @@ CENTER_FIXED_IDS = ['8644c1a8fffffff', '8644c1aafffffff','8644c1a87ffffff'] #, '
 
 
 SPAN_START   = "2025-06-01 00:00:00"
-SPAN_END     = "2025-06-02 00:00:00"
+SPAN_END     = "2025-06-03 00:00:00"
 TIME_RES_MIN = 30
 
 SPAN_START_TS = pd.to_datetime(SPAN_START)
@@ -307,7 +307,7 @@ DIRBIAS_NEUTRAL_SCHEDULE = [
 DIRBIAS_SCHEDULE_MODE = "absolute"
 
 
-WRITE_PEP_RAW        =  True #  False # 
+WRITE_PEP_RAW        =  False # True #  
 WRITE_PEP_OD         = True
 WRITE_PEP_BIN_TOTALS = False # True
 WRITE_PEP_TILE_POP   = True
@@ -355,13 +355,34 @@ def h3_to_latlon(hx: str) -> Tuple[float, float]:
         return float("nan"), float("nan")
 
 def h3_hex_edge_length_km(res: int) -> float:
-    return 0.659 * (7 ** (-res / 2))
+    """
+    Average H3 hexagon edge length (km) for a given resolution.
+    Uses the h3 library’s built-in function.
+    """
+    if h3 is None:
+        raise RuntimeError("h3 package not available")
+
+    # h3-py v4+ API
+    if hasattr(h3, "average_hexagon_edge_length"):
+        return float(h3.average_hexagon_edge_length(res, unit="km"))
+
+    # fallback for older h3-py variants (rare)
+    if hasattr(h3, "hexagon_edge_length"):
+        return float(h3.hexagon_edge_length(res, unit="km"))
+
+    raise RuntimeError("Could not find an H3 edge-length function in this h3 package")
 
 
 def h3_hex_diameter_km(res: int) -> float:
+    """
+    Approx diameter across opposite vertices (circumdiameter) of a regular hex.
+    If e is edge length, circumradius R = e / tan(pi/6) = e / (1/sqrt(3)) = sqrt(3)*e
+    Diameter = 2R = 2*sqrt(3)*e
+    """
     e = h3_hex_edge_length_km(res)
-    R = e / math.tan(math.pi / 6.0)
-    return 2.0 * R
+    return float(2.0 * math.sqrt(3.0) * e)
+
+
 
 
 
@@ -1258,6 +1279,10 @@ def simulate_pep_h3(
     # distance envelopes between all node pairs
     env = build_distance_envelopes_h3(nodes_df, H3_RESOLUTION)
 
+    print("[DEBUG] H3 res:", H3_RESOLUTION)
+    print("[DEBUG] edge_km:", h3_hex_edge_length_km(H3_RESOLUTION))
+    print("[DEBUG] diameter_km:", h3_hex_diameter_km(H3_RESOLUTION))
+
     # agent pool & IDs
     POOL_SIZE = int(total_per_bin)
     agent_ids = np.array([f"P{(k+1):06d}" for k in range(POOL_SIZE)], dtype=object)
@@ -2098,7 +2123,22 @@ def write_fixed_point_population_map(nodes_df, overlay, Q, run_dir):
     layer_metro.add_to(m)
 
     colormap.add_to(m)
+
+
     folium.LayerControl(collapsed=False).add_to(m)
+
+    style = """
+    <style>
+    .leaflet-control-colorbar {
+        right: 200px !important;
+    }
+    .leaflet-control-layers {
+        right: 200px !important;
+    }
+    </style>
+    """
+    m.get_root().header.add_child(folium.Element(style))
+
 
     title_html = """
     <div style="
