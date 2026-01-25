@@ -3,8 +3,7 @@ This code implements the generative mobility model in the paper "Mobility Trajec
 
 Please email Asif Shakeel: ashakeel@ucsd.edu with any questions
 
-
-# Mobility Trajectories (H3) — Markov Network Pipeline
+# Markov Network Pipeline
 
 Implements the H3-based mobility generator from:
 
@@ -16,6 +15,7 @@ https://arxiv.org/abs/2601.06020
 
 ## Pipeline Schematic
 
+```text
 Polygon / Study Region
         ↓
 H3 Discretization
@@ -40,24 +40,3 @@ flow_verification_h3.py
         ↓
 timeElapsed_flows_h3.py
 (single-step inflow / outflow / netflow)
-
-
-code_h3/
-├── graph_builder_h3.py
-├── pep_generator_h3.py
-├── flow_verification_h3.py
-├── timeElapsed_flows_h3.py
-│
-├── data/
-│   ├── regions/
-│   ├── h3_nodes/
-│   └── od_inputs/
-│
-├── outputs/
-│   ├── overlays/
-│   ├── pep_runs/
-│   ├── verification/
-│   └── timeElapsed_flows/
-│
-└── README.md
-
