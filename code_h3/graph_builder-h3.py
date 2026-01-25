@@ -1,6 +1,139 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+graph_builder_h3.py
+-------------------
+
+Synthetic corridor / feeder network generator on an H3 grid.
+
+This script constructs a directed, weighted *synthetic mobility overlay*
+on top of a base H3 adjacency graph for a given urban region.
+
+The output is a network that mimics hierarchical urban mobility structure:
+    • A central anchor (root)
+    • Multiple concentric hub rings
+    • Hub–center backbones
+    • Primary (and optional secondary) feeders
+    • Metro-style hub–hub links
+    • Optional background grid edges
+
+The result is a sparse, structured overlay graph that can be used as a
+*transport substrate* for Markov mobility models, effective distance,
+return-to-origin, corridor analysis, and other network-level mobility
+measures.
+
+----------------------------------------------------------------------
+CONCEPTUAL PIPELINE
+----------------------------------------------------------------------
+
+1) Region & grid
+   - Load region polygon from OSMnx.
+   - Optional buffering.
+   - Tile with H3 hexagons at H3_RESOLUTION.
+   - Build base H3 adjacency.
+
+2) Geometric anchor & center
+   - Choose a geometric anchor (H3 or centroid).
+   - Define the synthetic city center.
+
+3) Hub placement (ring model)
+   - Partition nodes into radial bands.
+   - Sample hubs per ring with spacing constraints.
+
+4) Backbone construction
+   - For each hub, compute shortest path to center.
+   - Paths define permanent backbone edges.
+
+5) Feeder construction
+   - Every non-hub node connects to nearest hub.
+   - Optional secondary feeders (dual mode).
+
+6) Metro tree
+   - Connect hubs by a geometric spanning tree.
+
+7) Overlay graph
+   - Overlay = backbone + feeders + metro.
+   - Optional background grid edges.
+
+8) Direction assignment
+   - Potential-field (hop distance from center), or
+   - Geometric radial gradient.
+
+----------------------------------------------------------------------
+OUTPUTS
+----------------------------------------------------------------------
+
+All outputs are written to:
+
+    outputs/corridors_outputs_h3/
+
+with a filename tag:
+
+    {city}_mode-h3_{fdr}_{edge}_{ovr}
+
+The generator produces:
+
+1) Network manifest (JSON)
+    corridors_manifest_{city}_mode-h3_{fdr}_{edge}_{ovr}.json
+
+   Contains:
+     • node coordinates and hub labels
+     • center anchor and potentials
+     • directed edges with delta_T, feeder_label, overlay_flag
+     • metro and backbone flags
+
+2) Node table (CSV)
+    corridor_potential_nodes_{city}_mode-h3_{fdr}_{edge}_{ovr}.csv
+
+3) Edge table (CSV)
+    corridor_potential_edges_{city}_mode-h3_{fdr}_{edge}_{ovr}.csv
+
+4) Interactive maps (HTML + PNG)
+    corridor_AM_map_{city}_mode-h3_{fdr}_{edge}_{ovr}.html
+    corridor_PM_map_{city}_mode-h3_{fdr}_{edge}_{ovr}.html
+    (PNG snapshots are auto-generated via Playwright)
+
+5) Structural diagnostics
+    max_hop_diameter_{city}_mode-h3_{fdr}_{edge}_{ovr}.csv
+        – maximum hop distance in overlay graph
+
+    corridor_feeder_diagnostics_{city}_mode-h3_{fdr}_{edge}_{ovr}.csv
+    corridor_neighbor_distances_{city}_mode-h3_{fdr}_{edge}_{ovr}.csv
+        – optional feeder and adjacency diagnostics
+
+6) GRID mode outputs (if GRAPH_MODE="grid")
+
+    grid_manifest_{city}_mode-h3.json
+    grid_nodes_{city}_mode-h3.csv
+    grid_edges_{city}_mode-h3.csv
+    grid_map_{city}_mode-h3.html
+
+----------------------------------------------------------------------
+INTENDED USE
+----------------------------------------------------------------------
+
+This overlay is NOT a real road network.
+It is a *synthetic structural prior* used to:
+
+    • define Markov transition operators
+    • compute effective distance
+    • simulate time-elapsed mobility
+    • study corridor persistence and accessibility
+    • avoid individual-level trajectory assumptions
+
+The generator is fully determined by its configuration
+and random seed.
+
+----------------------------------------------------------------------
+AUTHOR
+----------------------------------------------------------------------
+
+Asif Shakeel  
+ashakeel@ucsd.edu
+"""
+
+
 from __future__ import annotations
 import os, math, json, random
 from collections import defaultdict, deque
@@ -367,35 +500,7 @@ def bfs_farthest_with_parent(adj, src):
     far_node = max(visited, key=lambda k: visited[k])
     return far_node, visited[far_node], parent
 
-# ============================================================
-# HUB BACKBONE
-# ============================================================
 
-# def build_hub_backbone(nodes, hubs, center_cell, center_lat, center_lon, adj):
-#     global kept_edges_undirected
-
-#     for h in hubs:
-#         # shortest path on the real H3 adjacency
-#         dq = deque([h])
-#         parent = {h: None}
-
-#         while dq:
-#             u = dq.popleft()
-#             if u == center_cell:
-#                 # reconstruct
-#                 path = [u]
-#                 while parent[path[-1]] is not None:
-#                     path.append(parent[path[-1]])
-#                 path = path[::-1]
-
-#                 for a, b in zip(path[:-1], path[1:]):
-#                     kept_edges_undirected.add(tuple(sorted((a, b))))
-#                 break
-
-#             for v in adj[u]:      # ← FIX: use passed-in adjacency
-#                 if v not in parent:
-#                     parent[v] = u
-#                     dq.append(v)
 
 def bfs_path(src, dst, forbidden, adj):
     dq = deque([src])
@@ -413,82 +518,6 @@ def bfs_path(src, dst, forbidden, adj):
                 parent[v]=u; dq.append(v)
     return None
 
-# def build_hub_backbone(nodes, hubs, center_cell, center_lat, center_lon, adj, hub_ring_index):
-#     """
-#     Correct backbone:
-#     - Innermost ring hubs connect to center
-#     - Other hubs connect to nearest hub in strictly inner ring
-#     - All via shortest geodesic path on adj
-#     """
-#     global kept_edges_undirected, hub_backbone_flag
-#     kept_edges_undirected = kept_edges_undirected
-#     hub_backbone_flag = {}
-
-#     # group hubs by ring
-#     ring_to_hubs = defaultdict(list)
-#     for h in hubs:
-#         ring_to_hubs[hub_ring_index[h]].append(h)
-
-#     # sort rings numerically
-#     sorted_rings = sorted(ring_to_hubs.keys())
-
-#     # -----------------------------------------------------
-#     # 1) INNERMOST RING → center_cell
-#     # -----------------------------------------------------
-#     r0 = sorted_rings[0]
-#     for h in ring_to_hubs[r0]:
-#         if h == center_cell:
-#             continue
-
-#         p = bfs_path(h, center_cell, set(), adj)
-#         if not p:
-#             continue
-
-#         for u, v in zip(p[:-1], p[1:]):
-#             e = tuple(sorted((u, v)))
-#             kept_edges_undirected.add(e)
-#             hub_backbone_flag[(u, v)] = 1
-#             hub_backbone_flag[(v, u)] = 1
-
-#     # -----------------------------------------------------
-#     # 2) OUTER RINGS → nearest hub in strictly inner ring
-#     # -----------------------------------------------------
-#     for r in sorted_rings[1:]:
-#         inner_hubs = []
-#         for r2 in sorted_rings:
-#             if r2 < r:
-#                 inner_hubs.extend(ring_to_hubs[r2])
-
-#         if not inner_hubs:
-#             continue
-
-#         for h in ring_to_hubs[r]:
-#             # find nearest inner hub (geodesic)
-#             best = None
-#             best_d = None
-#             lat_h, lon_h = nodes[h]["lat"], nodes[h]["lon"]
-
-#             for k in inner_hubs:
-#                 lat_k, lon_k = nodes[k]["lat"], nodes[k]["lon"]
-#                 d = haversine_m(lat_h, lon_h, lat_k, lon_k)
-
-#                 if best_d is None or d < best_d:
-#                     best_d = d
-#                     best = k
-
-#             if best is None:
-#                 continue
-
-#             # BFS path from h → best inner hub
-#             p = bfs_path(h, best, set(), adj)
-#             if not p:
-#                 continue
-
-#             for u, v in zip(p[:-1], p[1:]):
-#                 e = tuple(sorted((u, v)))
-#                 kept_edges_undirected.add(e)
-#                 hub_backbone_flag[(u, v)] = 1
-#                 hub_backbone_flag[(v, u)] = 1
 
 def build_hub_backbone(nodes, hubs, center_cell, adj):
     """
@@ -599,52 +628,6 @@ def compute_geom_dist(nodes,center_lat,center_lon):
         D[c]=haversine_m(center_lat,center_lon,nd["lat"],nd["lon"])/1000.0
     return D
 
-# ============================================================
-# DIRECTED EDGE RECORDS
-# ============================================================
-
-# def build_edge_records(nodes, adj, corridor_edges, metro_edges, T_overlay, D_geom_km):
-#     metro_set=set(tuple(sorted(e)) for e in metro_edges)
-#     corridor_set=set(tuple(sorted(e)) for e in corridor_edges)
-
-#     all_edges=set()
-#     for (u,v) in kept_edges_undirected:
-#         all_edges.add((u,v))
-#     for e in metro_set:
-#         all_edges.add(e)
-
-#     edges_dir=[]
-#     for (u,v) in all_edges:
-#         for (a,b) in [(u,v),(v,u)]:
-#             du=D_geom_km[a]
-#             dv=D_geom_km[b]
-#             dkm=du-dv
-#             if dkm>GEOM_TOL_KM:
-#                 dgeom=1
-#             elif dkm<-GEOM_TOL_KM:
-#                 dgeom=-1
-#             else:
-#                 dgeom=0
-
-#             Tu=T_overlay.get(a,10**9)
-#             Tv=T_overlay.get(b,10**9)
-#             delta_T=(None if Tu>=10**9 or Tv>=10**9 else Tu-Tv)
-#             if EDGE_DIRECTION_MODE=="geometric":
-#                 delta_T=dgeom
-
-#             fl=feeder_label.get((a,b),0)
-
-#             edges_dir.append({
-#                 "start_h3":a,"end_h3":b,
-#                 "origin":a,"dest":b,
-#                 "delta_T":delta_T,
-#                 "delta_geom":dgeom,
-#                 "delta_geom_km":dkm,
-#                 "is_metro":int(tuple(sorted((a,b))) in metro_set),
-#                 "overlay_flag":int(tuple(sorted((a,b))) in (metro_set|corridor_set)),
-#                 "feeder_label":fl,
-#             })
-#     return edges_dir
 
 
 def build_edge_records(nodes, adj_base, corridor, metro, T_overlay, D_geom):
@@ -855,30 +838,6 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
 
     g_regular=FeatureGroup("Corridor/background",show=True)
 
-
-
-    # g_grid = FeatureGroup(name="Base Grid (debug)", show=True)
-    # m.add_child(g_grid)
-
-    # # draw all adjacency edges as dotted bright lines
-    # seen_grid = set()
-    # for u, nd in nodes.items():
-    #     for v in adj.get(u, []):
-    #         e = tuple(sorted((u, v)))
-    #         if e in seen_grid:
-    #             continue
-    #         seen_grid.add(e)
-
-    #         lat_u, lon_u = nodes[u]["lat"], nodes[u]["lon"]
-    #         lat_v, lon_v = nodes[v]["lat"], nodes[v]["lon"]
-
-    #         folium.PolyLine(
-    #             [(lat_u, lon_u), (lat_v, lon_v)],
-    #             color="#00ffff",       # bright cyan
-    #             weight=1,
-    #             opacity=0.6,
-    #             dash_array="4,4"       # dotted
-    #         ).add_to(g_grid)
 
 
     g_metro=FeatureGroup("Metro edges",show=True)
@@ -1098,47 +1057,6 @@ def build_metro_tree(nodes, hubs, center_lat, center_lon):
 
     return list(edges)
 
-# def write_grid_manifest(
-#     nodes,
-#     edges,
-#     manifest_path
-# ):
-#     manifest = {
-#         "mode": "grid",
-#         "seed": SEED,
-#         "region": REGION_NAME,
-#         "region_source": "osmnx",
-#         "region_buffer_km": REGION_BUFFER_KM,
-#         "h3_resolution": H3_RESOLUTION,
-
-#         "nodes": {
-#             c: {
-#                 "lat": nd["lat"],
-#                 "lon": nd["lon"]
-#             }
-#             for c, nd in nodes.items()
-#         },
-
-#         "edges": {
-#             "undirected": [
-#                 {
-#                     "start_h3": e["start_h3"],
-#                     "end_h3": e["end_h3"],
-#                     "w_norm": e.get("w_norm", 1.0)
-#                 }
-#                 for e in edges
-#             ]
-#         }
-#     }
-
-#     with open(manifest_path, "w") as f:
-#         json.dump(manifest, f, indent=2)
-
-#     print("[OK] Wrote GRID manifest:", manifest_path)
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def run():
     random.seed(SEED)
@@ -1241,11 +1159,7 @@ def run():
             out_html=map_html
         )
 
-        # write_grid_manifest(
-        #     nodes=nodes,
-        #     edges=edges_dir,
-        #     manifest_path=manifest_path
-        # )
+
         write_outputs(
             nodes=nodes,
             hubs=[],
@@ -1278,23 +1192,6 @@ def run():
 
     hubs,hub_ring_index=place_hubs(nodes,center_lat,center_lon)
 
-    # print("\n=== HARD DIAGNOSTIC ===")
-    # print("Center in nodes:", center_cell in nodes)
-
-    # for h in hubs:
-    #     print(h, "in nodes:", h in nodes)
-
-    # print("Adjacency keys equal node keys:", set(adj.keys()) == set(nodes.keys()))
-    # print("Total nodes:", len(nodes))
-    # print("Total adj entries:", len(adj))
-    # print("=== END HARD DIAGNOSTIC ===\n")
-
-
-
-    # hub = "864995b97ffffff"   # replace with correct ID
-    # print("H3 distance:", h3.grid_distance(center_cell, hub))
-    # print("center->hub in adj:", hub in adj.get(center_cell, []))
-    # print("hub->center in adj:", center_cell in adj.get(hub, []))
 
     global kept_edges_undirected, feeder_label
     kept_edges_undirected=set()
@@ -1399,18 +1296,12 @@ def run():
     edges_dir=build_edge_records(nodes,adj,corridor_edges,metro_edges,
                                  T_overlay,D_geom_km)
 
-    # city="MexicoCity"
-    # tag="mode-h3"
-    # manifest_path=os.path.join(OUT_DIR,f"manifest_{city}_{tag}.json")
-    # nodes_csv=os.path.join(OUT_DIR,f"nodes_{city}_{tag}.csv")
-    # edges_csv=os.path.join(OUT_DIR,f"edges_{city}_{tag}.csv")
 
     write_outputs(nodes,hubs,hub_ring_index,center_cell,T_overlay,
                   edges_dir,center_lat,center_lon,
                   manifest_path,nodes_csv,edges_csv)
 
-    # build_map(nodes,hubs,hub_ring_index,center_cell,
-    #           edges_dir,metro_edges,corridor_edges)
+
 
     build_map(nodes, hubs, hub_ring_index, center_cell,
             edges_dir, metro_edges, corridor_edges, adj,out_html=am_html)

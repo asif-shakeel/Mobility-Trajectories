@@ -1,32 +1,220 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-pep_generator_h3.py — Clean, consolidated, schedule-aware H3 PEP generator.
-
-Python 3.10
-
-Implements full A–G mobility modules with ENABLE_* gates:
-    A. Stay probabilities (center/periphery + schedules)
-    B. Destination mass (center/periphery + schedules)
-    C. Hub pstay overrides
-    D. Hub mass multipliers
-    E. Feeder edge scaling
-    F. Hub outgoing metro-edge scaling
-    G. Directional bias scaling
-
-Plus:
-    - Auto-run directory generator
-    - Gravity kernel (power law)
-    - Column-stochastic kernels
-    - Daily operator Q
-    - Periodic fixed point
-    - P̄ storage
-    - Q storage
-    - X0 generation
-
-No geohash remains. Fully H3-native.
 
 """
+pep_generator_h3.py
+==================
+
+Synthetic Periodic Mobility Generator on an H3 Overlay Graph
+------------------------------------------------------------
+
+This script constructs a *time-dependent, column-stochastic mobility operator*
+P(b) on an H3 tessellation and uses it to simulate a synthetic population of
+agents (PEPs: pseudo-empirical persons) moving through space and time.
+
+The generator is built to operate on the *synthetic corridor overlay*
+produced by `graph_builder_h3.py`.  The overlay encodes:
+
+    • hub hierarchy
+    • backbone corridors
+    • feeders (primary / secondary)
+    • metro hub–hub edges
+    • potential / geometric direction fields
+
+On top of this structural prior, this generator applies ** modular
+behavioral fields (A–G)** that modulate transition probabilities in time.
+
+The output is a fully periodic, schedule-aware, gravity-based mobility model
+that produces:
+
+    • P(b)   : per–time-bin Markov kernels
+    • P̄     : daily mean kernel
+    • Q     : daily operator (product of P(b))
+    • X₀    : stationary (periodic fixed point) population
+    • PEP   : synthetic agent trajectories
+    • OD    : aggregated origin–destination flows
+    • maps  : spatial diagnostics and animations
+
+
+    ----------------------------------------------------------------------
+OUTPUTS
+----------------------------------------------------------------------
+
+All results are written to an auto-generated run directory:
+
+    outputs/runs/<region>/h3res-<R>/graph-<mode>/fdr-<fdr>/edge-<pot|geom>/ovr-<0|1>/
+        <YYYYMMDDTHHMM_YYYYMMDDTHHMM>/m<T>/x-<init>/
+
+Subfolders:
+
+    npz/     numerical operators and kernels
+    csvs/    synthetic OD flows and diagnostics
+    maps/    interactive HTML maps
+    plots/   time-series PNG diagnostics
+    logs/    (reserved)
+
+Core numerical outputs (npz/):
+
+    nodes.npy        ordered list of H3 node IDs
+    P_day0.npz       P(b) kernels for one full day
+    Pbar.npy        daily mean kernel P̄
+    Q.npy            daily operator Q = Π_b P(b)
+    X0.npy           stationary (periodic fixed point) population
+
+Synthetic mobility data (csvs/):
+
+    pep_raw.csv
+        One row per agent per time bin:
+            PEP_ID, start_h3, end_h3, date, time,
+            length_m, travel_time_min
+
+    pep_od.csv
+        Aggregated OD flows per time bin:
+            start_h3, end_h3, date, time,
+            trip_count,
+            mean_length_m, median_length_m, std_length_m,
+            mean_travel_time_min, median_travel_time_min, std_travel_time_min
+
+    pep_population_by_tile.csv
+        Initial vs final population per H3 cell:
+            h3, initial_count, initial_share,
+            final_count, final_share, delta_share,
+            is_center, is_hub
+
+    diag_temporal_center_netflow.csv
+        Center inflow / outflow / netflow per time bin
+
+    diag_mean_center_netflow_per_timebin.csv
+        Daily mean center netflow by time of day
+
+
+Maps (maps/):
+
+    pep_population_map.html
+        Choropleth of final (or initial) PEP population by H3 cell
+
+    initial_population_map.html
+        Static map of X₀ (stationary initial distribution)
+
+    fixed_point_population_map.html
+        Stationary population from Q (true periodic fixed point)
+
+    mass_timeseries_map.html
+        TimeSlider choropleth of mass evolution x(b)
+
+
+Plots (plots/):
+
+    center_flows_timeseries.png
+        Center → periphery, periphery → center, and net flows vs time
+
+----------------------------------------------------------------------
+CONCEPTUAL MODEL
+----------------------------------------------------------------------
+
+Let P(b) be a column-stochastic matrix where:
+
+    P[d, o] = Pr( destination = d | origin = o )  at time-bin b
+
+The generator builds P(b) by composing:
+
+    • Gravity kernel:
+        w(o,d) ∝ (mass_d)^α · dist(o,d)^(-β)
+
+    • Structural overlay:
+        w(o,d) *= overlay_weight(o,d)
+
+    • Time-dependent behavioral fields (A–G)
+
+Then for each origin o:
+
+    P[o,o] = p_stay(o, b)
+    P[d,o] = (1 - p_stay(o,b)) · w(o,d) / Σ_d w(o,d)
+
+This yields a *column-stochastic* operator suitable for mass evolution:
+
+    x_{b+1} = P(b) · x_b
+
+
+----------------------------------------------------------------------
+MODULES (A–G)
+----------------------------------------------------------------------
+
+Each module is independently switchable and can operate in
+absolute or multiplicative schedule modes.
+
+A. Stay probability (origin-based)
+    • center vs periphery baselines
+    • daily schedules
+    • optional override for hubs
+
+B. Destination mass (destination-based)
+    • center vs periphery baselines
+    • daily schedules
+
+C. Hub stay overrides
+    • hub-specific stay modulation
+
+D. Hub mass multipliers
+    • amplifies or suppresses hub attraction
+
+E. Feeder edge scaling
+    • primary / secondary feeder boosts
+    • center vs periphery differentiation
+
+F. Hub outgoing metro scaling
+    • time-varying hub-to-hub amplification
+
+G. Directional bias
+    • inward vs outward flow bias
+    • driven by overlay potential / geometry
+
+
+----------------------------------------------------------------------
+PIPELINE
+----------------------------------------------------------------------
+
+1) Load corridor overlay manifest (H3-native)
+2) Load nodes (lat/lon, hub, center)
+3) Build one-day periodic P(b)
+4) Compute:
+       P̄  = mean_b P(b)
+       Q  = Π_b P(b)
+       X₀ = fixed point of Q
+5) Simulate multinomial agent flows (PEPs)
+6) Aggregate to OD and diagnostics
+7) Generate maps and plots
+
+
+----------------------------------------------------------------------
+DESIGN PHILOSOPHY
+----------------------------------------------------------------------
+
+This is NOT a route choice model and NOT an activity-based model.
+
+It is a ** mobility generator ** designed to:
+
+    • encode spatial hierarchy
+    • enforce periodic structure, not memory
+    • allow time-varying directional asymmetry
+    • remain analytically tractable (Markovian)
+
+The generator is reproducible given the configuration
+and random seed, and is intended as a *structural prior* for:
+
+    • effective distance
+    • accessibility
+    • congestion proxies
+    • corridor persistence
+    • synthetic OD generation
+
+----------------------------------------------------------------------
+AUTHOR
+----------------------------------------------------------------------
+
+Asif Shakeel (ashakeel@ucsd.edu)
+"""
+
 
 from __future__ import annotations
 
@@ -2415,31 +2603,6 @@ def main():
         print("[WARN] Some CENTER_FIXED_IDS were not found in nodes_df:", missing)
     else:
         print("[INFO] All CENTER_FIXED_IDS found in nodes_df.")
-
-    # # override manifest definition
-    # centers_set = set(CENTER_FIXED_IDS)
-    # print("[INFO] centers_set size:", len(centers_set))
-
-    # print("=== CENTER CONSISTENCY CHECK ===")
-
-    # # 1. Centers loaded from config
-    # print("Center IDs (config):")
-    # for c in CENTER_FIXED_IDS:
-    #     print("  ", c)
-
-    # # 2. Centers detected in nodes_df
-    # print("\nCenter IDs found in nodes_df:")
-    # for c in centers_set:
-    #     print("  ", c)
-
-    # # 3. Check which centers are missing in nodes_df
-    # missing = [c for c in CENTER_FIXED_IDS if c not in centers_set]
-    # print("\nCenters NOT found in nodes_df:", missing)
-
-    # # 4. Check is_center flag inside nodes_df
-    # print("\nCount is_center==1 in nodes_df:", nodes_df["is_center"].sum())
-
-
 
 
     if MODE == "validate":
