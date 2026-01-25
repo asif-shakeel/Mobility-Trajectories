@@ -1,5 +1,10 @@
 # Mobility-Trajectories
-This code implements the generative mobility model in the paper "Mobility Trajectories from Network-Driven Markov Dynamics" (https://arxiv.org/abs/2601.06020)
+This code implements the generative mobility model in the paper
+**Meyer , Shakeel (2026)**  
+*Mobility Trajectories from Network-Driven Markov Dynamics*  
+https://arxiv.org/abs/2601.06020  
+
+---
 
 Please email Asif Shakeel: ashakeel@ucsd.edu with any questions
 
@@ -7,11 +12,6 @@ Please email Asif Shakeel: ashakeel@ucsd.edu with any questions
 
 Implements the H3-based mobility generator from:
 
-**Meyer & Shakeel (2026)**  
-*Mobility Trajectories from Network-Driven Markov Dynamics*  
-https://arxiv.org/abs/2601.06020  
-
----
 
 ## Pipeline Schematic
 
