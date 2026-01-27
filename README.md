@@ -1,3 +1,8 @@
+Copyright (c) 2019 Asif Shakeel
+
+**License:** [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+
 # Mobility-Trajectories
 This code implements the generative mobility model in the paper
 **Meyer , Shakeel (2026)**  
