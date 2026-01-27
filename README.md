@@ -1,7 +1,3 @@
-Copyright (c) 2026 Asif Shakeel
-
-**License:** [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-
 
 # Mobility-Trajectories
 This code implements the generative mobility model in the paper
@@ -12,6 +8,11 @@ https://arxiv.org/abs/2601.06020
 ---
 
 Please email Asif Shakeel: ashakeel@ucsd.edu with any questions
+
+Copyright (c) 2026 Asif Shakeel
+
+**License:** [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
 
 # Markov Network Pipeline
 
