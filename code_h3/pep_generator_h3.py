@@ -225,9 +225,7 @@ from typing import Dict, Tuple, List, Optional, Sequence, Set
 
 import numpy as np
 import pandas as pd
-import folium  # NOTE(dead-code): top-level folium unused (local imports used instead).
-from folium.plugins import Fullscreen  # NOTE(dead-code): unused.
-import branca.colormap as bcm  # NOTE(dead-code): unused.
+ 
 import matplotlib.pyplot as plt
 import sys 
 # h3 optional
@@ -236,8 +234,7 @@ try:
 except ImportError:
     h3 = None
     print("[WARN] h3 package not available; H3->lat/lon fallback will be disabled.")
-from folium.plugins import TimeSliderChoropleth  # NOTE(dead-code): unused at top level.
-from folium import GeoJson  # NOTE(dead-code): unused at top level.
+
 
 
 def progress(msg):
@@ -1905,7 +1902,6 @@ def write_mass_timeseries_html_map(
     os.makedirs(maps_dir, exist_ok=True)
 
     tiles = nodes_df["h3"].astype(str).tolist()
-    N     = len(tiles)  # NOTE(dead-code): N unused.
 
     # ---------------------------------------------------
     # Build polygons as full Feature objects with matching IDs
@@ -2172,7 +2168,6 @@ def write_fixed_point_population_map(nodes_df, overlay, Q, run_dir):
     """
     import folium
     from folium import FeatureGroup
-    import numpy as np
     import os
     import branca.colormap as cm
 
@@ -2385,16 +2380,6 @@ def generate_pep_h3(
     print(f"[OK] wrote {nodes_path}")
 
     # Preload lat/lon arrays
-    lat = nodes_df["lat"].to_numpy(float)  # NOTE(dead-code): lat unused.
-    lon = nodes_df["lon"].to_numpy(float)  # NOTE(dead-code): lon unused.
-
-    # RNG for moves + lengths
-    rng_moves = np.random.default_rng((SEED, 200))  # NOTE(dead-code): rng_moves unused.
-    rng_len   = np.random.default_rng((SEED, 201))  # NOTE(dead-code): rng_len unused.
-
-    # Precompute minutes-of-day labels
-    minutes = [WINDOW_START_HH*60 + b*TIME_RES_MIN for b in range(bins_per_day)]  # NOTE(dead-code): minutes unused.
-
     # ----------------------------------------------------
     # 1. Compute all P(b)
     # ----------------------------------------------------

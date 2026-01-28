@@ -137,17 +137,15 @@ ashakeel@ucsd.edu
 from __future__ import annotations
 import os, math, json, random
 from collections import defaultdict, deque
-from typing import Dict, List, Tuple, Optional  # NOTE(dead-code): Dict/List/Tuple unused.
+from typing import Optional
 
 import h3
-from shapely.geometry import shape  # NOTE(dead-code): shape unused.
-from shapely.ops import unary_union, transform  # NOTE(dead-code): unary_union unused.
+from shapely.ops import transform
 from pyproj import CRS, Transformer
 
 import folium
 from folium import FeatureGroup
 from folium.plugins.fullscreen import Fullscreen
-import playwright  # NOTE(dead-code): playwright unused.
 # ============================================================
 # CONFIG
 # ============================================================
@@ -267,7 +265,7 @@ def load_region_polygon():
     return poly, poly.bounds
 
 
-from shapely.geometry import Polygon, Point  # NOTE(dead-code): Point unused.
+from shapely.geometry import Polygon
 
 def h3_cell_polygon(h):
     boundary = h3.cell_to_boundary(h)  # list of (lat, lon)
@@ -814,7 +812,7 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
     Fullscreen().add_to(m)
 
 
-    title_html = f"""
+    title_html = """
     <div style="
         position: fixed;
         top: 10px;
@@ -847,8 +845,6 @@ def build_map(nodes, hubs, hub_ring_index, center_cell,
     for g in (g_regular,g_metro,g_arrows,g_hubs,g_nodes):
         m.add_child(g)
 
-    metro_set=set(tuple(sorted(e)) for e in metro_edges)  # NOTE(dead-code): metro_set unused.
-    corridor_set=set(tuple(sorted(e)) for e in corridor_edges)  # NOTE(dead-code): corridor_set unused.
     feeder_dir={(e["start_h3"],e["end_h3"]): e["feeder_label"] for e in edges_dir}
 
     from shapely.geometry import mapping
@@ -1031,7 +1027,6 @@ def build_metro_tree(nodes, hubs, center_lat, center_lon):
 
     # Sort hubs from closest to farthest from center
     ordered = sorted(hubs, key=lambda h: hub_dist[h])
-    root = ordered[0]  # NOTE(dead-code): root unused.
 
     edges = set()
 
@@ -1083,19 +1078,6 @@ def run():
         OUT_DIR,
         f"corridor_AM_map_{city_tag}_{mode_tag}_{feeder_tag}_{dir_tag}_{overlay_tag}.html"
     )
-    pm_html = os.path.join(  # NOTE(dead-code): pm_html unused.
-        OUT_DIR,
-        f"corridor_PM_map_{city_tag}_{mode_tag}_{feeder_tag}_{dir_tag}_{overlay_tag}.html"
-    )
-    diag_csv = os.path.join(  # NOTE(dead-code): diag_csv unused.
-        OUT_DIR,
-        f"corridor_feeder_diagnostics_{city_tag}_{mode_tag}_{feeder_tag}_{dir_tag}_{overlay_tag}.csv"
-    )
-    neighbor_csv = os.path.join(  # NOTE(dead-code): neighbor_csv unused.
-        OUT_DIR,
-        f"corridor_neighbor_distances_{city_tag}_{mode_tag}_{feeder_tag}_{dir_tag}_{overlay_tag}.csv"
-    )
-
     # --- keep the rest of your run() exactly as-is ---
 
     random.seed(SEED)
@@ -1188,7 +1170,7 @@ def run():
     if GEOM_CENTER_MODE=="h3" and center_cell not in nodes:
         lat,lon=h3.cell_to_latlng(center_cell)
         nodes[center_cell]={"lat":lat,"lon":lon}
-        adj=centered=build_h3_adjacency(nodes)  # NOTE(dead-code): centered unused.
+        adj = build_h3_adjacency(nodes)
 
     hubs,hub_ring_index=place_hubs(nodes,center_lat,center_lon)
 
@@ -1244,12 +1226,6 @@ def run():
     # Corridor edges = kept feeder + backbone
     corridor_edges = list(kept_edges_undirected)
     
-    # -----------------------------------
-    # Overlay edges = all non-background structure
-    # -----------------------------------
-    overlay_edges = set(corridor_edges) | set(metro_edges)  # NOTE(dead-code): overlay_edges unused.
-
-
     overlay_adj = build_overlay_adj(corridor_edges,metro_edges)
     if center_cell not in overlay_adj:
         overlay_adj[center_cell]=[]

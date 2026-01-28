@@ -153,7 +153,7 @@ email: ashakeel@ucsd.edu
 
 import os, json, html
 from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, List  # NOTE(dead-code): Dict/List unused.
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -522,8 +522,6 @@ def add_title(m, text: str, *, top_px=10):
             """
         )
     )
-
-from branca.element import MacroElement, Template  # NOTE(dead-code): duplicate import.
 
 def add_stacked_legends(
     m,
