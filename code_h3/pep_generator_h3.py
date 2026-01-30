@@ -524,8 +524,8 @@ MAKE_PEP_MAP      = True
 PEP_MAP_VALUE_COL = "initial_share"   # or "final_share"
 PEP_MAP_MODE      = "count"           # "share" or "count"
 
-TOTAL_PER_BIN_FIXED   = 120000        # you already wanted this
-SEED                  = 12345         # or whatever you’re using
+TOTAL_PER_BIN_FIXED   = 120000        # the number of PEPs to simulate
+SEED                  = 12345         # random seed
 
 # ---------------------------------------------------------------------
 # Helper functions
